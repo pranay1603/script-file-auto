@@ -3,11 +3,11 @@
 #here we have created the script for non root user for setting up the environment
 
 ##taking the root password from the user
-read -p "/nEnter your root password : " root
+read -p "\nEnter your root password : " root
 
 ##taking app password for cloning 
 
-read -p "/nEnter your app password for git cloning : " apppass
+read -p "\nEnter your app password for git cloning : " apppass
 
 ##Setting the tomcat9 server 
 
@@ -60,17 +60,6 @@ else
    sudo systemctl start elasticsearch
 fi     	
 
-sleep 30s
-
-#checking if elasticsearch is properly working 
-
-if curl -XGET http://localhost:9200 &>/dev/null
-then
-   echo "Elasticsearch run successfully"
-else
-   curl -XGET http://localhost:9200   
-fi   
-
 #Installing Git
 sudo apt install git -y 
 
@@ -85,6 +74,15 @@ then
 else
    mkdir -p $dir;cd $dir;git clone https://pranay1603:$apppass@bitbucket.org/senpiper/dev-env-setup.git
 fi  	
+
+#checking if elasticsearch is properly working 
+
+if curl -XGET http://localhost:9200 &>/dev/null
+then
+   echo "Elasticsearch run successfully"
+else
+   curl -XGET http://localhost:9200   
+fi   
 
 
 
@@ -124,14 +122,6 @@ fi
 cd $dir/ ;git clone https://pranay1603:$apppass@bitbucket.org/senpiper/core.git
 
 
-#creating the core keyspace in cassandra 
-# Load the keyspaces
-cqlsh -e "CREATE KEYSPACE core WITH replication = {'class': 'SimpleStrategy', 'replication_factor': '1'}  AND durable_writes = true;"
-cqlsh -k core -f "$dir/core/CQL Scripts/DDL Script.sql"
-cqlsh -f $dir/dev-env-setup/cassandra/attendance.cql
-
-
-
 #Building Rabbitmq server
 #creating apt repos for installing rabbitmq 
 
@@ -169,6 +159,12 @@ else
    sudo systemctl status rabbitmq-server
    exit   
 fi
+
+#creating the core keyspace in cassandra 
+# Load the keyspaces
+cqlsh -e "CREATE KEYSPACE core WITH replication = {'class': 'SimpleStrategy', 'replication_factor': '1'}  AND durable_writes = true;"
+cqlsh -k core -f "$dir/core/CQL Scripts/DDL Script.sql"
+cqlsh -f $dir/dev-env-setup/cassandra/attendance.cql
 
 # building the openresty app gateway 
 
@@ -261,6 +257,8 @@ fi
 
 #installing mkcert
 
+read -p "Enter your Home path of your user : " home
+cd $home
 echo "$root" |sudo -S apt install libnss3-tools -y
 wget https://github.com/FiloSottile/mkcert/releases/download/v1.1.2/mkcert-v1.1.2-linux-amd64
 mv mkcert-v1.1.2-linux-amd64 mkcert
@@ -271,7 +269,7 @@ mkcert local.senpiper.com *.local.senpiper.com localhost 127.0.0.1 ::1
 
 #switching to repo user to do entry into the /etc/host file
 
-echo "$root" |sudo -S sed -i 's/\(^127.0.0.1.*\)/\1\tdevsetup.local.senpiper.com/g' /etc/hosts
+echo "$root" |sudo -S sed -i 's/\(^127.0.0.1.*\)/\1\tlocal.senpiper.com/g' /etc/hosts
 
 #copying the certificates into the openresty folder 
 sudo cp ./local.senpiper.com+4.pem /etc/openresty/ssl/fullchain.pem
@@ -287,12 +285,13 @@ else
 fi
 
 #checking the configuration
-if openresty -t &>/dev/null
+if sudo openresty -t &>/dev/null
 then
    echo "configuration check successfully of openresty"
    sudo systemctl restart openresty 
 else
-  sudo  openresty -t 
+  sudo openresty -t
+  exit 
 fi  
 
 
@@ -318,3 +317,4 @@ sed -i  "s/[S,s]etup/$subdomain/g" $dir/$company.txt
 #Creating entry into the cassandra db
 
 cqlsh -k core -f $dir/$company.txt
+
